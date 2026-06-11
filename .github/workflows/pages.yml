@@ -40,7 +40,9 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp client/dist-standalone/standalone.html _site/index.html
+          html="$(find client/dist-standalone -name '*.html' | head -1)"
+          test -n "$html" || { echo "no built HTML found"; exit 1; }
+          cp "$html" _site/index.html
 
       - uses: actions/configure-pages@v5
         with:
