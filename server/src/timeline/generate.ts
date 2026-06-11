@@ -1,8 +1,8 @@
-import { generate } from "../llm/index.js";
+import type { GenerateFn } from "./provider.js";
 import { GeneratedNode, type Timeline, type TimelineNode } from "./schema.js";
 import { NODE_LIST_SCHEMA, ROOT_SCHEMA } from "./jsonSchema.js";
 import { parseNodeList, validateOrRepair } from "./parse.js";
-import { childrenPrompt, rootPrompt, threadPrompt, type StageMeta } from "./prompts.js";
+import { rootPrompt, threadPrompt, type StageMeta } from "./prompts.js";
 
 let counter = 0;
 function makeId(): string {
@@ -43,12 +43,16 @@ function stageMetas(rootYear: number, yearsForward: number): StageMeta[] {
   return [immediate, medium, long];
 }
 
-async function generateRoot(divergence: string, drama: number): Promise<TimelineNode> {
-  const text = await generate(rootPrompt(divergence, drama), {
+async function generateRoot(
+  divergence: string,
+  drama: number,
+  gen: GenerateFn
+): Promise<TimelineNode> {
+  const text = await gen(rootPrompt(divergence, drama), {
     schema: ROOT_SCHEMA,
     maxTokens: 3000,
   });
-  const parsed = await validateOrRepair(text, GeneratedNode, ROOT_SCHEMA);
+  const parsed = await validateOrRepair(text, GeneratedNode, ROOT_SCHEMA, gen);
   if (parsed) {
     return { id: "root", parent_id: null, stage: 0, ...parsed, confidence: "likely" };
   }
@@ -72,12 +76,13 @@ async function expandNode(args: {
   meta: StageMeta;
   drama: number;
   followUp?: string;
+  gen: GenerateFn;
 }): Promise<TimelineNode[]> {
-  const { divergence, ancestry, parent, meta, drama, followUp } = args;
+  const { divergence, ancestry, parent, meta, drama, followUp, gen } = args;
   const prompt = threadPrompt({ divergence, ancestry, stage: meta, drama, followUp });
-  const text = await generate(prompt, { schema: NODE_LIST_SCHEMA, maxTokens: 6000 });
-  const gen = await parseNodeList(text, NODE_LIST_SCHEMA);
-  return gen.slice(0, meta.childrenWanted).map((g) => ({
+  const text = await gen(prompt, { schema: NODE_LIST_SCHEMA, maxTokens: 6000 });
+  const children = await parseNodeList(text, NODE_LIST_SCHEMA, gen);
+  return children.slice(0, meta.childrenWanted).map((g) => ({
     id: makeId(),
     parent_id: parent.id,
     stage: meta.stage,
@@ -85,13 +90,16 @@ async function expandNode(args: {
   }));
 }
 
-export async function buildTimeline(req: {
-  prompt: string;
-  yearsForward: number;
-  drama: number;
-}): Promise<Timeline> {
+export async function buildTimeline(
+  req: {
+    prompt: string;
+    yearsForward: number;
+    drama: number;
+  },
+  gen: GenerateFn
+): Promise<Timeline> {
   const { prompt, yearsForward, drama } = req;
-  const root = await generateRoot(prompt, drama);
+  const root = await generateRoot(prompt, drama, gen);
 
   const nodes: TimelineNode[] = [root];
   const ancestry = new Map<string, TimelineNode[]>([[root.id, [root]]]);
@@ -107,6 +115,7 @@ export async function buildTimeline(req: {
           parent,
           meta,
           drama,
+          gen,
         })
       )
     );
@@ -130,11 +139,14 @@ export async function buildTimeline(req: {
  * Pull a thread: re-root the simulation beneath the chosen node, reasoning
  * two further stages down. Existing nodes are kept; new ones are appended.
  */
-export async function pullThread(args: {
-  timeline: Timeline;
-  nodeId: string;
-  followUp?: string;
-}): Promise<Timeline> {
+export async function pullThread(
+  args: {
+    timeline: Timeline;
+    nodeId: string;
+    followUp?: string;
+  },
+  gen: GenerateFn
+): Promise<Timeline> {
   const { timeline, nodeId, followUp } = args;
   const byId = new Map(timeline.nodes.map((n) => [n.id, n]));
   const start = byId.get(nodeId);
@@ -171,6 +183,7 @@ export async function pullThread(args: {
     meta: metaA,
     drama,
     followUp,
+    gen,
   });
   for (const c of childrenA) {
     added.push(c);
@@ -194,6 +207,7 @@ export async function pullThread(args: {
         meta: metaB,
         drama,
         followUp,
+        gen,
       })
     )
   );

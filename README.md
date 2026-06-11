@@ -43,6 +43,29 @@ Set `LLM_PROVIDER` in `.env`:
 - `ollama` — point `OLLAMA_BASE_URL` at a running Ollama (`http://localhost:11434`)
   and `OLLAMA_MODEL` at a pulled model (e.g. `qwen2.5`). Fully offline.
 
+## Run it with no setup (single file)
+
+There's a standalone build that inlines the entire app into **one HTML file**
+that runs fully in the browser — no server, no install. Good for opening on a
+phone or anywhere you can't run Node.
+
+```bash
+npm --prefix client install
+npm --prefix client run build:standalone   # -> client/dist-standalone/standalone.html
+```
+
+Open that file in any browser. It loads the sample timeline immediately and is
+fully interactive (scroll the branching tree, click nodes). For **live**
+generation, open ⚙ Settings and paste your own Anthropic API key — the
+standalone build calls the Anthropic API directly from the browser
+(`anthropic-dangerous-direct-browser-access`). The key is stored only in that
+browser's local storage and is sent only to Anthropic. Leave it blank to just
+browse the sample.
+
+> The standalone build reuses the exact same staged-generation core as the
+> server (`server/src/timeline`) — the LLM call is dependency-injected, so the
+> same pipeline runs server-side or in-browser.
+
 ## How generation works
 
 Consequences are reasoned in **stages**, not requested all at once:

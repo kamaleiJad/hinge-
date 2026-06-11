@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { generate } from "../llm/index.js";
+import type { GenerateFn } from "./provider.js";
 import { GeneratedNode, type GeneratedNode as GNode } from "./schema.js";
 
 /**
@@ -52,7 +52,8 @@ function tryParse<T>(text: string, schema: z.ZodType<T>): T | null {
 export async function validateOrRepair<T>(
   text: string,
   schema: z.ZodType<T>,
-  jsonSchema: Record<string, unknown>
+  jsonSchema: Record<string, unknown>,
+  gen: GenerateFn
 ): Promise<T | null> {
   const first = tryParse(text, schema);
   if (first) return first;
@@ -63,7 +64,7 @@ export async function validateOrRepair<T>(
     "\n\nReturn ONLY corrected JSON — no prose, no code fences. Text to fix:\n\n" +
     text;
 
-  const repaired = await generate(repairPrompt, { schema: jsonSchema, maxTokens: 4000 });
+  const repaired = await gen(repairPrompt, { schema: jsonSchema, maxTokens: 4000 });
   return tryParse(repaired, schema);
 }
 
@@ -75,7 +76,8 @@ const NodeListLenient = z.object({ nodes: z.array(z.unknown()) });
  */
 export async function parseNodeList(
   text: string,
-  jsonSchema: Record<string, unknown>
+  jsonSchema: Record<string, unknown>,
+  gen: GenerateFn
 ): Promise<GNode[]> {
   let parsed = tryParse(text, NodeListLenient);
   if (!parsed) {
@@ -84,7 +86,7 @@ export async function parseNodeList(
       JSON.stringify(jsonSchema) +
       "\n\nReturn ONLY corrected JSON. Text to fix:\n\n" +
       text;
-    const repaired = await generate(repairPrompt, { schema: jsonSchema, maxTokens: 4000 });
+    const repaired = await gen(repairPrompt, { schema: jsonSchema, maxTokens: 4000 });
     parsed = tryParse(repaired, NodeListLenient);
   }
   if (!parsed) return [];

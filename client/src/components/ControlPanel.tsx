@@ -6,9 +6,17 @@ interface Props {
   initialPrompt: string;
   busy: boolean;
   onRun: (args: { prompt: string; yearsForward: number; drama: number }) => void;
+  standalone?: boolean;
+  onOpenSettings?: () => void;
 }
 
-export function ControlPanel({ initialPrompt, busy, onRun }: Props) {
+export function ControlPanel({
+  initialPrompt,
+  busy,
+  onRun,
+  standalone = false,
+  onOpenSettings,
+}: Props) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [yearsForward, setYears] = useState<number>(200);
   const [drama, setDrama] = useState(0.4);
@@ -20,10 +28,23 @@ export function ControlPanel({ initialPrompt, busy, onRun }: Props) {
 
   return (
     <aside className="w-80 shrink-0 border-r border-ink-faint/30 bg-parchment-dark/40 p-5 overflow-y-auto">
-      <h1 className="font-serif text-2xl tracking-tight text-ink">Hinge</h1>
-      <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">
-        Counterfactual History Engine
-      </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="font-serif text-2xl tracking-tight text-ink">Hinge</h1>
+          <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+            Counterfactual History Engine
+          </p>
+        </div>
+        {standalone && (
+          <button
+            onClick={onOpenSettings}
+            title="Live generation settings"
+            className="mt-1 rounded-sm border border-ink-faint/40 px-2 py-1 font-mono text-xs text-ink-soft hover:border-accent/60"
+          >
+            ⚙
+          </button>
+        )}
+      </div>
 
       <label className="mt-6 block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-soft">
         Divergence
@@ -88,6 +109,7 @@ export function ControlPanel({ initialPrompt, busy, onRun }: Props) {
       <p className="mt-3 font-mono text-[10px] leading-relaxed text-ink-faint">
         ⌘/Ctrl + Enter to run. Consequences are reasoned in stages — immediate
         effects first, then fed back to derive medium and long-term branches.
+        {standalone && " Live runs need an Anthropic key — set one in ⚙."}
       </p>
     </aside>
   );

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { HANNIBAL_SAMPLE } from "./timeline/hardcoded.js";
 import { Timeline } from "./timeline/schema.js";
 import { buildTimeline, pullThread } from "./timeline/generate.js";
-import { activeProvider } from "./llm/index.js";
+import { activeProvider, generate } from "./llm/index.js";
 
 const app = express();
 app.use(cors());
@@ -34,7 +34,7 @@ app.post("/api/timeline/generate", async (req: Request, res: Response) => {
     return res.status(400).json({ error: parsed.error.issues.map((i) => i.message).join("; ") });
   }
   try {
-    const timeline = await buildTimeline(parsed.data);
+    const timeline = await buildTimeline(parsed.data, generate);
     res.json(timeline);
   } catch (e) {
     console.error("[generate]", e);
@@ -54,7 +54,7 @@ app.post("/api/timeline/pull-thread", async (req: Request, res: Response) => {
     return res.status(400).json({ error: parsed.error.issues.map((i) => i.message).join("; ") });
   }
   try {
-    const timeline = await pullThread(parsed.data);
+    const timeline = await pullThread(parsed.data, generate);
     res.json(timeline);
   } catch (e) {
     console.error("[pull-thread]", e);
