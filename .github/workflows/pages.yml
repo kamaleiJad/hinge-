@@ -1,0 +1,54 @@
+name: Deploy Hinge to Pages
+
+# Publishes the standalone single-file build to GitHub Pages, so it can be
+# opened at a real URL in a phone browser (which runs the app's JavaScript;
+# the iOS Files/Quick Look preview does not).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install client deps
+        run: npm install --prefix client
+
+      - name: Build standalone single-file app
+        run: npm --prefix client run build:standalone
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp client/dist-standalone/standalone.html _site/index.html
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
