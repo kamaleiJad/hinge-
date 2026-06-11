@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-parchment text-ink font-sans antialiased;
+    /* A faint ledger texture: hairline horizontal rules, like a research notebook. */
+    background-image: linear-gradient(
+      to bottom,
+      transparent,
+      transparent 27px,
+      rgba(124, 94, 60, 0.06) 27px,
+      rgba(124, 94, 60, 0.06) 28px
+    );
+    background-size: 100% 28px;
+  }
+}
+
+@layer utilities {
+  /* Thin, restrained scrollbar for the horizontal timeline rail. */
+  .rail-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(124, 94, 60, 0.35) transparent;
+  }
+  .rail-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+  .rail-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(124, 94, 60, 0.35);
+    border-radius: 9999px;
+  }
+}
