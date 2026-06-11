@@ -1,7 +1,11 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Request, type Response } from "express";
 import cors from "cors";
+import { z } from "zod";
 import { HANNIBAL_SAMPLE } from "./timeline/hardcoded.js";
+import { Timeline } from "./timeline/schema.js";
+import { buildTimeline, pullThread } from "./timeline/generate.js";
+import { activeProvider } from "./llm/index.js";
 
 const app = express();
 app.use(cors());
@@ -10,34 +14,54 @@ app.use(express.json({ limit: "1mb" }));
 const PORT = Number(process.env.PORT ?? 8787);
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, provider: process.env.LLM_PROVIDER ?? "anthropic" });
+  res.json({ ok: true, provider: activeProvider() });
 });
 
-// A hardcoded divergence, available directly for reference.
+// A hardcoded divergence, handy for UI work without burning tokens.
 app.get("/api/timeline/sample", (_req, res) => {
   res.json(HANNIBAL_SAMPLE);
 });
 
-// Phase 1 stub: the full request/response loop works end-to-end, but the
-// body is the hardcoded sample regardless of input. Phase 2 replaces the
-// internals with staged LLM generation while keeping this contract.
-app.post("/api/timeline/generate", (req, res) => {
-  const { prompt, yearsForward, drama } = req.body ?? {};
-  res.json({
-    ...HANNIBAL_SAMPLE,
-    prompt: typeof prompt === "string" && prompt.trim() ? prompt : HANNIBAL_SAMPLE.prompt,
-    yearsForward: yearsForward ?? HANNIBAL_SAMPLE.yearsForward,
-    drama: drama ?? HANNIBAL_SAMPLE.drama,
-  });
+const GenerateBody = z.object({
+  prompt: z.string().min(1).max(2000),
+  yearsForward: z.union([z.literal(10), z.literal(50), z.literal(200)]).default(50),
+  drama: z.number().min(0).max(1).default(0.4),
 });
 
-// Phase 1 stub: returns the timeline unchanged. Phase 2 implements real
-// thread-pulling (deepen / re-root from a node).
-app.post("/api/timeline/pull-thread", (req, res) => {
-  const { timeline } = req.body ?? {};
-  res.json(timeline ?? HANNIBAL_SAMPLE);
+app.post("/api/timeline/generate", async (req: Request, res: Response) => {
+  const parsed = GenerateBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues.map((i) => i.message).join("; ") });
+  }
+  try {
+    const timeline = await buildTimeline(parsed.data);
+    res.json(timeline);
+  } catch (e) {
+    console.error("[generate]", e);
+    res.status(502).json({ error: e instanceof Error ? e.message : "Generation failed." });
+  }
+});
+
+const PullThreadBody = z.object({
+  timeline: Timeline,
+  nodeId: z.string(),
+  followUp: z.string().max(2000).optional(),
+});
+
+app.post("/api/timeline/pull-thread", async (req: Request, res: Response) => {
+  const parsed = PullThreadBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.issues.map((i) => i.message).join("; ") });
+  }
+  try {
+    const timeline = await pullThread(parsed.data);
+    res.json(timeline);
+  } catch (e) {
+    console.error("[pull-thread]", e);
+    res.status(502).json({ error: e instanceof Error ? e.message : "Thread expansion failed." });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`[hinge] server listening on http://localhost:${PORT}`);
+  console.log(`[hinge] server listening on http://localhost:${PORT} (provider: ${activeProvider()})`);
 });
