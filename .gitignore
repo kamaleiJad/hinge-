@@ -6,3 +6,5 @@ hinge.html
 .env.local
 *.log
 .DS_Store
+
+*.tsbuildinfo
