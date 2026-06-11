@@ -34,6 +34,11 @@ jobs:
       - name: Install client deps
         run: npm install --prefix client
 
+      # The standalone build reuses server/src/timeline (the @core alias),
+      # whose files import zod — so server deps must be present too.
+      - name: Install server deps (shared generation core)
+        run: npm install --prefix server
+
       - name: Build standalone single-file app
         run: npm --prefix client run build:standalone
 
